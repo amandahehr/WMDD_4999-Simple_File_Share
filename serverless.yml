@@ -1,0 +1,63 @@
+service: take-home-4999
+
+frameworkVersion: ">=1.1.0"
+
+custom:
+  bucket: <your bucket name>
+
+provider:
+  name: aws
+  runtime: nodejs6.10
+  stage: dev
+  region: us-west-1
+  environment:
+    FILES_TABLE: ${self:service}-${opt:stage, self:provider.stage}
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+      Resource: "*"
+
+resources:
+  Resources:
+    FilesDynamoDbTable:
+      Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
+      Properties:
+        AttributeDefinitions:
+          -
+            AttributeName: "id"
+            AttributeType: "S"
+        KeySchema:
+          -
+            AttributeName: "id"
+            KeyType: "HASH"
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        StreamSpecification:
+          StreamViewType: "NEW_AND_OLD_IMAGES"
+        TableName: ${self:provider.environment.FILES_TABLE}
+
+functions:
+  save:
+    handler: handler.save
+    environment:
+      BUCKET: ${self:custom.bucket}
+    events:
+      - http:
+          path: files
+          method: post
+          cors: true
+  list:
+    handler: handler.list
+    memorySize: 128
+    events:
+      - http:
+          path: files
+          method: get
+          cors: true
